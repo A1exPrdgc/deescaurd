@@ -8,9 +8,10 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 
 import deescaurd.Controleur;
+import deescaurd.ihm.chat.FrameChat;
 import deescaurd.ihm.connexion.FrameJoin;
 
-public class ClientChat implements Runnable
+public class ClientChat
 {
 	private Socket socket;
 	private PrintWriter out;
@@ -18,9 +19,12 @@ public class ClientChat implements Runnable
 	private String pseudo;
 	private Controleur ctrl;
 
+	private FrameChat ihm;
+
 	public ClientChat(String adresseServeur, int port, Controleur ctrl) 
 	{
 		this.ctrl = ctrl;
+		System.out.println("test 1");
 
 		try 
 		{
@@ -33,29 +37,29 @@ public class ClientChat implements Runnable
 			out = new PrintWriter(socket.getOutputStream(), true);
 			in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
+
 			// Gérer l'authentification (choix du pseudonyme)
 			this.authentification();
- 
-			// Démarrer un thread pour lire les messages du serveur
-			new Thread(this).start();
 
 			// Boucle pour envoyer des messages
-			this.boucle();
+			System.out.println("hhh");
+			new Thread(new MessageRecu()).start();
+			new Thread(new MessageEnvoyee()).start();
 		} 
 		catch (IOException e) 
 		{
 			JOptionPane.showMessageDialog(new JFrame(), e, "Erreur", JOptionPane.ERROR_MESSAGE);
 			new FrameJoin(this.ctrl);
 		} 
-		finally 
+		/*finally 
 		{
 			close();
-		}
+		}*/
 	}
 
 	private void authentification() throws IOException 
 	{
-		Scanner scanner = new Scanner(System.in);
+		//Scanner scanner = new Scanner(System.in);
 		System.out.println(in.readLine()); // Message de bienvenue et demande de pseudonyme
 		while (true) 
 		{
@@ -71,21 +75,13 @@ public class ClientChat implements Runnable
 		}
 	}
 	
-	private void boucle() 
+	// s'occupe de l'envois des messages
+	/*private void boucle() 
 	{
-		Scanner scanner = new Scanner(System.in);
-		System.out.println("Vous pouvez maintenant envoyer des messages (tapez 'quit' pour quitter) : \n /quiestenligne pour voir la liste des connectés");
-		while (true) 
-		{
-			String message = scanner.nextLine();
-			if (message.equalsIgnoreCase("quit")) 
-			{
-				System.out.println("Déconnexion...");
-				break;
-			}
-			out.println(message);
-		}
-	}
+		//Scanner scanner = new Scanner(System.in);
+		//System.out.println("Vous pouvez maintenant envoyer des messages (tapez 'quit' pour quitter) : \n /quiestenligne pour voir la liste des connectés");
+		//Thread.dumpStack();
+	}*/
 
 	private void close() 
 	{     
@@ -103,24 +99,65 @@ public class ClientChat implements Runnable
 		}
 	}
 
-	@Override
-	public void run() 
+	private class MessageRecu implements Runnable
 	{
-		try 
+		@Override
+		public void run() 
 		{
-			String message;
-			while ((message = in.readLine()) != null) 
+			System.out.println("Reception lancé...");
+			try 
 			{
-				System.out.println(message);
+				String message;
+				while ((message = in.readLine()) != null) 
+				{
+					ClientChat.this.ctrl.ajouterMessage(message);
+				}
+
+				try {new Thread().sleep(200);
+				} catch (InterruptedException e) {}
+			} 
+			catch (IOException e) 
+			{
+				System.err.println("Connexion au serveur perdue.");
+				e.printStackTrace();
+			} 
+			finally 
+			{
+				close();
 			}
-		} 
-		catch (IOException e) 
+		}
+	}
+
+	private class MessageEnvoyee implements Runnable
+	{
+		@Override
+		public void run() 
 		{
-			System.err.println("Connexion au serveur perdue.");
-		} 
-		finally 
-		{
-			close();
+			System.out.println("Envoi lancé...");
+			while (true) 
+			{
+				//String message = scanner.nextLine();
+				String message = ClientChat.this.ctrl.getMessage();
+				if(message != null)
+				{
+					if (message.equalsIgnoreCase("quit")) 
+					{
+						System.out.println("Déconnexion...");
+						System.exit(0);
+						break;
+					}
+					
+					out.println(message);
+					try {new Thread().sleep(300);
+					} catch (InterruptedException e) {}
+
+					ClientChat.this.ctrl.setMessage(null);
+				}
+				try {new Thread().sleep(200);
+				} catch (InterruptedException e) {}
+				
+				//System.out.println("test 1 : boucle");
+			}
 		}
 	}
 }
